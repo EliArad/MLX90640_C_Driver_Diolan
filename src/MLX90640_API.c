@@ -40,7 +40,7 @@ int ValidateAuxData(uint16_t *auxData);
   
 int MLX90640_DumpEE(uint16_t *eeData)
 {
-     return MLX90640_I2CRead(0x2400, 832, eeData);
+     return MLX90640_I2CRead832(0x2400, 832, eeData);
 }
 
 int MLX90640_SynchFrame()
@@ -109,7 +109,7 @@ int MLX90640_TriggerMeasurement()
     return 0;    
 }
     
-int MLX90640_GetFrameData(uint16_t *frameData)
+int MLX90640_GetFrameData(uint16_t *frameData, int frameDataSize)
 {
     uint16_t dataReady = 0;
     uint16_t controlRegister1;
@@ -121,7 +121,7 @@ int MLX90640_GetFrameData(uint16_t *frameData)
     while(dataReady == 0)
     {
         error = MLX90640_I2CRead16(0x8000, 1, &statusRegister);
-        if(error != 0)
+        if(error != 1)
         {
             return error;
         }    
@@ -129,19 +129,19 @@ int MLX90640_GetFrameData(uint16_t *frameData)
     }      
     
     error = MLX90640_I2CWrite16(0x8000, 0x0030);
-    if(error == -1)
+    if(error != 1)
     {
         return error;
     }
                      
-    error = MLX90640_I2CRead(0x0400, 768, frameData); 
-    if(error != 0)
+    error = MLX90640_I2CReadFrame(0x0400, frameDataSize, frameData);
+    if(error != 1)
     {
         return error;
     }                       
     
-    error = MLX90640_I2CRead(0x0700, 64, data); 
-    if(error != 0)
+    error = MLX90640_I2CRead64(0x0700, 64, data); 
+    if(error != 1)
     {
         return error;
     }     
@@ -150,22 +150,23 @@ int MLX90640_GetFrameData(uint16_t *frameData)
     frameData[832] = controlRegister1;
     frameData[833] = statusRegister & 0x0001;
     
-    if(error != 0)
+    if(error != 1)
     {
         return error;
     }
     
+#if 0 
     error = ValidateAuxData(data);
-    if(error == 0)
+    if(error == 1)
     {
         for(cnt=0; cnt<64; cnt++)
         {
             frameData[cnt+768] = data[cnt];
         }
     }        
-    
+#endif     
     error = ValidateFrameData(frameData);
-    if (error != 0)
+    if (error != 1)
     {
         return error;
     }
@@ -183,7 +184,7 @@ int ValidateFrameData(uint16_t *frameData)
         line = line + 1;
     }    
         
-    return 0;    
+    return 1;    
 }
 
 int ValidateAuxData(uint16_t *auxData)
@@ -221,29 +222,43 @@ int ValidateAuxData(uint16_t *auxData)
         if(auxData[i] == 0x7FFF) return -8;
     }
     
-    return 0;
+    return 1;
     
+}
+
+int CheckEEPROMValid(uint16_t eeData[])
+{
+	int deviceSelect;
+	deviceSelect = eeData[10] & 0x0040;
+	if (deviceSelect == 0)
+	{
+		return 1;
+	}
+
+	return -7;
 }
     
 int MLX90640_ExtractParameters(uint16_t *eeData, paramsMLX90640 *mlx90640)
 {
-    int error = 0;
-    
-    ExtractVDDParameters(eeData, mlx90640);
-    ExtractPTATParameters(eeData, mlx90640);
-    ExtractGainParameters(eeData, mlx90640);
-    ExtractTgcParameters(eeData, mlx90640);
-    ExtractResolutionParameters(eeData, mlx90640);
-    ExtractKsTaParameters(eeData, mlx90640);
-    ExtractKsToParameters(eeData, mlx90640);
-    ExtractCPParameters(eeData, mlx90640);
-    ExtractAlphaParameters(eeData, mlx90640);
-    ExtractOffsetParameters(eeData, mlx90640);
-    ExtractKtaPixelParameters(eeData, mlx90640);
-    ExtractKvPixelParameters(eeData, mlx90640);
-    ExtractCILCParameters(eeData, mlx90640);
-    error = ExtractDeviatingPixels(eeData, mlx90640);  
-    
+     
+	int error = CheckEEPROMValid(eeData);
+	if (error == 1)
+	{
+		ExtractVDDParameters(eeData, mlx90640);
+		ExtractPTATParameters(eeData, mlx90640);
+		ExtractGainParameters(eeData, mlx90640);
+		ExtractTgcParameters(eeData, mlx90640);
+		ExtractResolutionParameters(eeData, mlx90640);
+		ExtractKsTaParameters(eeData, mlx90640);
+		ExtractKsToParameters(eeData, mlx90640);
+		ExtractCPParameters(eeData, mlx90640);
+		ExtractAlphaParameters(eeData, mlx90640);
+		ExtractOffsetParameters(eeData, mlx90640);
+		ExtractKtaPixelParameters(eeData, mlx90640);
+		ExtractKvPixelParameters(eeData, mlx90640);
+		ExtractCILCParameters(eeData, mlx90640);
+		error = ExtractDeviatingPixels(eeData, mlx90640);
+	}    
     return error;
 
 }
@@ -258,7 +273,7 @@ int MLX90640_SetResolution(uint8_t resolution)
     
     value = (resolution & 0x03) << 10;
     
-    error = MLX90640_I2CRead(0x800D, 1, &controlRegister1);
+    error = MLX90640_I2CRead16(0x800D, 1, &controlRegister1);
     
     if(error == 0)
     {
@@ -277,8 +292,8 @@ int MLX90640_GetCurResolution()
     int resolutionRAM;
     int error;
     
-    error = MLX90640_I2CRead(0x800D, 1, &controlRegister1);
-    if(error != 0)
+    error = MLX90640_I2CRead16(0x800D, 1, &controlRegister1);
+    if(error != 1)
     {
         return error;
     }    
@@ -297,7 +312,7 @@ int MLX90640_SetRefreshRate(uint8_t refreshRate)
     
     value = (refreshRate & 0x07)<<7;
     
-    error = MLX90640_I2CRead(0x800D, 1, &controlRegister1);
+    error = MLX90640_I2CRead16(0x800D, 1, &controlRegister1);
     if(error == 0)
     {
         value = (controlRegister1 & 0xFC7F) | value;
@@ -315,8 +330,8 @@ int MLX90640_GetRefreshRate()
     int refreshRate;
     int error;
     
-    error = MLX90640_I2CRead(0x800D, 1, &controlRegister1);
-    if(error != 0)
+    error = MLX90640_I2CRead16(0x800D, 1, &controlRegister1);
+    if(error != 1)
     {
         return error;
     }    
@@ -333,7 +348,7 @@ int MLX90640_SetInterleavedMode()
     int value;
     int error;
     
-    error = MLX90640_I2CRead(0x800D, 1, &controlRegister1);
+    error = MLX90640_I2CRead16(0x800D, 1, &controlRegister1);
     
     if(error == 0)
     {
@@ -353,7 +368,7 @@ int MLX90640_SetChessMode()
     int error;
 	  
 
-    error = MLX90640_I2CRead(0x800D, 1, &controlRegister1);
+    error = MLX90640_I2CRead16(0x800D, 1, &controlRegister1);
     
     if(error == 0)
     {
@@ -373,7 +388,7 @@ int MLX90640_GetCurMode()
     int error;
     
     error = MLX90640_I2CRead16(0x800D, 1, &controlRegister1);
-    if(error != 0)
+    if(error != 1)
     {
         return error;
     }    
@@ -1416,7 +1431,7 @@ int ExtractDeviatingPixels(uint16_t *eeData, paramsMLX90640 *mlx90640)
     uint16_t pixCnt = 0;
     uint16_t brokenPixCnt = 0;
     uint16_t outlierPixCnt = 0;
-    int warn = 0;
+    int warn = 1;
     int i;
     
     for(pixCnt = 0; pixCnt<5; pixCnt++)

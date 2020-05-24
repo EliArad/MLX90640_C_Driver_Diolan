@@ -19,10 +19,11 @@
 
 #include <stdint.h>
 
-    int MLX90640_I2CInit(uint8_t slaveAddress);
+    int MLX90640_I2CInit(uint8_t slaveAddress, uint32_t sn);
 	int MLX90640_I2CWrite(uint16_t writeAddress, uint32_t size, uint8_t* data);
 	int MLX90640_I2CWrite16(uint16_t writeAddress, uint16_t data);
 	int MLX90640_I2CRead(uint16_t startAddress, uint32_t size, uint16_t* data);
+	int MLX90640_I2CRead832(uint16_t startAddress, uint32_t size, uint16_t* data);
 	int MLX90640_I2CRead16(uint16_t startAddress, uint32_t size, uint16_t* data);
 
 #endif
